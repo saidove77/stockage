@@ -17,6 +17,25 @@
 <script>try{var t=localStorage.getItem('theme');if(t==='dark'||(!t&&matchMedia('(prefers-color-scheme: dark)').matches))document.documentElement.classList.add('dark')}catch(e){}</script>
 <script src="https://cdn.tailwindcss.com/3.4.17"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <!-- Firebase SDKs -->
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+
+<script>
+  // تهيئة Firebase
+  const firebaseConfig = {
+    apiKey: "AIzaSyBnHLsf3lPVrdFn7I55UwkydCEtQ0sdHmAi",
+    authDomain: "gestion-de-stock-340b3.firebaseapp.com",
+    projectId: "gestion-de-stock-340b3",
+    storageBucket: "gestion-de-stock-340b3.firebasestorage.app",
+    messagingSenderId: "127691147828",
+    appId: "1:127691147828:web:0tecfd0e1276e6024ce401",
+    measurementId: "G-GZS536M71L"
+  };
+
+  firebase.initializeApp(firebaseConfig);
+  const db = firebase.firestore();
+</script>
 <style>
 #print-area,#report-area{display:none}
 @media print{
@@ -376,7 +395,23 @@ const HEADER_SRC = (() => {
     return URL.createObjectURL(new Blob([u], { type: 'image/jpeg' }));
   } catch (e) { return HEADER_IMG; }
 })();
-const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwo3DPrbEuf8MgkFN37D_sPYxrwcQT4nhS2g6wW5H-ui2VkdlXjr5IPI4PcgZw6oXI/exec";
+// دالة جلب البيانات وعرضها في الوقت الفعلي
+function loadDataFromFirebase() {
+  db.collection("inventory").onSnapshot((snapshot) => {
+    let items = [];
+    snapshot.forEach((doc) => {
+      items.push({ id: doc.id, ...doc.data() });
+    });
+    
+    // قم باستدعاء دالة تحديث الواجهة الخاصة بك هنا (مثلاً: renderTable(items))
+    console.log("البيانات المحدثة:", items);
+  }, (error) => {
+    console.error("خطأ في جلب البيانات: ", error);
+  });
+}
+
+// تشغيل الجلب فور تحميل الصفحة
+document.addEventListener("DOMContentLoaded", loadDataFromFirebase);
 let currentLang = 'ar', currentTab = 'dashboard', currentForm = {type:'', id:null};
 let isSaving = false, loaded = false, shouldPrint = false;
 let appData = { Articles: [], Schools: [], Movements: [], Plans: [], PlanLines: [] };
