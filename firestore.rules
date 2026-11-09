@@ -1,0 +1,46 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn()   { return request.auth != null; }
+    function hasProfile() { return signedIn() && exists(/databases/$(database)/documents/users/$(request.auth.uid)); }
+    function profile()    { return get(/databases/$(database)/documents/users/$(request.auth.uid)).data; }
+    function active()     { return hasProfile() && profile().active == true; }
+    function isAdmin()    { return active() && profile().role == 'admin'; }
+    function canWrite()   { return active() && (profile().role == 'admin' || profile().role == 'manager'); }
+
+    // الحسابات: كل مستخدم يقرأ ملفه فقط، والمدير يدير الجميع.
+    // إنشاء أول مدير مسموح مرة واحدة فقط (قبل وجود settings/bootstrap).
+    match /users/{uid} {
+      allow get: if signedIn() && (request.auth.uid == uid || isAdmin());
+      allow list: if isAdmin();
+      allow create: if isAdmin() || (
+        signedIn() && request.auth.uid == uid
+        && request.resource.data.role == 'admin'
+        && request.resource.data.active == true
+        && !exists(/databases/$(database)/documents/settings/bootstrap));
+      allow update, delete: if isAdmin();
+    }
+
+    // الإعدادات: وثيقة bootstrap قابلة للقراءة قبل الدخول (لمعرفة هل أُنشئ المدير الأول)
+    match /settings/{id} {
+      allow get: if id == 'bootstrap' || active();
+      allow list: if active();
+      allow create, update, delete: if isAdmin();
+    }
+
+    // سجل العمليات: المدير فقط يقرأه، ويكتب فيه من يملك صلاحية التعديل
+    match /auditLog/{id} {
+      allow read: if isAdmin();
+      allow create: if canWrite();
+      allow update, delete: if isAdmin();
+    }
+
+    // بيانات التطبيق: القراءة لكل مستخدم مفعّل، التعديل للمدير ومسؤول المخزون، الحذف للمدير فقط
+    match /{col}/{id} {
+      allow read: if active() && col in ['articles','schools','movements','procurements','internalServices','inspectors','counters'];
+      allow create, update: if canWrite() && col in ['articles','schools','movements','procurements','internalServices','inspectors','counters'];
+      allow delete: if isAdmin() && col in ['articles','schools','movements','procurements','internalServices','inspectors','counters'];
+    }
+  }
+}
